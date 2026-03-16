@@ -1,0 +1,14 @@
+{
+  "name": "mews-kiosk-api",
+  "version": "1.0.0",
+  "main": "mews-kiosk-server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node mews-kiosk-server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}
