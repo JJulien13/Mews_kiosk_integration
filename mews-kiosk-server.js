@@ -627,40 +627,46 @@ app.get('/age-categories', async (req, res) => {
 // }
 app.post('/orders', async (req, res) => {
   try {
-    const {
-      accountId,
-      serviceId,
-      enterpriseId,
-      productOrders,
-      items,
-      notes,
-    } = req.body;
+    const { accountId, serviceId, enterpriseId, items } = req.body;
 
-    if (!accountId) {
+    const finalAccountId = accountId || MEWS_CONFIG.demoCustomerId;
+    const finalServiceId = serviceId || MEWS_CONFIG.serviceId;
+    const finalEnterpriseId = enterpriseId || MEWS_CONFIG.enterpriseId;
+
+    if (!finalAccountId) {
       return res.status(400).json({ error: 'accountId est requis' });
     }
 
+    // ✅ Mapper items vers format Mews ProductOrder
+    const productOrders = items.map(item => ({
+      ProductId: item.productId,  // optionnel, si fourni
+      UnitCount: item.quantity || 1,
+      UnitAmount: {
+        Currency: "GBP",  // fixe pour démo
+        Value: item.unitPrice || 1.20,  // fallback prix Rooh Afza
+        NetValue: (item.unitPrice || 1.20) * 0.8,  // HT
+        GrossValue: item.unitPrice || 1.20,  // TTC
+        TaxValues: [{
+          Code: "UK-2022-20%",  // ex. UK VAT
+          Value: (item.unitPrice || 1.20) * 0.2
+        }]
+      }
+    }));
+
     const body = {
       ...baseBody(),
-      EnterpriseId: enterpriseId || MEWS_CONFIG.enterpriseId,
-      ServiceId: serviceId || MEWS_CONFIG.serviceId,
-      AccountId: accountId,
+      EnterpriseId: finalEnterpriseId,
+      ServiceId: finalServiceId,
+      AccountId: finalAccountId,
+      ProductOrders: productOrders  // ✅ Mews attend ÇA
     };
 
-    if (Array.isArray(productOrders) && productOrders.length > 0) {
-      body.ProductOrders = productOrders;
-    }
-    if (Array.isArray(items) && items.length > 0) {
-      body.Items = items;
-    }
-    if (notes) {
-      body.Notes = notes;
-    }
+    console.log("[MEWS] POST /api/connector/v1/orders/add body=", JSON.stringify(body, null, 2));
 
     const data = await mewsPost('/api/connector/v1/orders/add', body);
-    // data = { OrderId, ChargeId }
     res.json(data);
   } catch (err) {
+    console.error("[ORDERS] Erreur:", err);
     res.status(500).json({ error: err.message });
   }
 });
