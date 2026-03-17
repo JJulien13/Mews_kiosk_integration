@@ -644,7 +644,6 @@ app.post('/orders', async (req, res) => {
       UnitAmount: {
         Currency: "GBP",  // fixe pour démo
         Value: item.unitPrice || 1.20,  // fallback prix Rooh Afza
-        NetValue: (item.unitPrice || 1.20) * 0.8,  // HT
         GrossValue: item.unitPrice || 1.20,  // TTC
         TaxValues: [{
           Code: "UK-2022-20%",  // ex. UK VAT
