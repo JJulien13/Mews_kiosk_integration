@@ -130,25 +130,44 @@ app.get('/services', async (req, res) => {
   }
 });
 
-// 4) Récupérer les produits associés à un service
-// POST https://api.mews-demo.com/api/connector/v1/products/getAll
+// 4) Récupérer les produits de MULTIPLES services POS
+// GET /products?serviceIds=["id1","id2"]&count=200
+// ou /products?serviceId=un-seul&count=50 (ancien comportement)
 app.get('/products', async (req, res) => {
   try {
-    const serviceId = req.query.serviceId || MEWS_CONFIG.serviceId;
-    const count = req.query.count ? parseInt(req.query.count, 10) : 10;
+    let serviceIds = [];
+    const serviceIdsStr = req.query.serviceIds;
+    const count = req.query.count ? parseInt(req.query.count, 10) : 50;
+
+    // 👈 Parse serviceIds JSON depuis le front
+    if (serviceIdsStr) {
+      try {
+        serviceIds = JSON.parse(decodeURIComponent(serviceIdsStr));
+        if (!Array.isArray(serviceIds)) serviceIds = [];
+      } catch (e) {
+        console.warn('serviceIds invalide:', e.message);
+      }
+    } else {
+      // Ancien comportement compatible : un seul serviceId
+      serviceIds = [req.query.serviceId || MEWS_CONFIG.serviceId].filter(Boolean);
+    }
+
+    console.log(`📦 Récup produits de ${serviceIds.length} services:`, serviceIds.slice(0, 3));
 
     const body = {
       ...baseBody(),
-      ServiceIds: [serviceId],
+      ServiceIds: serviceIds,
       Limitation: { Count: count },
     };
 
     const data = await mewsPost('/api/connector/v1/products/getAll', body);
     res.json(data);
   } catch (err) {
+    console.error('❌ Erreur /products:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // 5) Récupérer les disponibilités d'un service (par catégorie de chambre / ressource)
 // POST https://api.mews-demo.com/api/connector/v1/services/getAvailability
