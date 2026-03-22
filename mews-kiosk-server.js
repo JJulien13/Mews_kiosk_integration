@@ -627,7 +627,14 @@ app.get('/age-categories', async (req, res) => {
 // }
 app.post('/orders', async (req, res) => {
   try {
-    const { accountId, serviceId, enterpriseId, items } = req.body;
+    const {
+      accountId,
+      serviceId,
+      enterpriseId,
+      productOrders,  // 👈 Mews préfère ce format
+      items,          // 👈 ou celui-là (fallback)
+      notes,
+    } = req.body;
 
     const finalAccountId = accountId || MEWS_CONFIG.demoCustomerId;
     const finalServiceId = serviceId || MEWS_CONFIG.serviceId;
@@ -637,38 +644,43 @@ app.post('/orders', async (req, res) => {
       return res.status(400).json({ error: 'accountId est requis' });
     }
 
-    // ✅ Mapper items vers format Mews ProductOrder
-    const productOrders = items.map(item => ({
-      ProductId: item.productId,  // optionnel, si fourni
-      UnitCount: item.quantity || 1,
-      UnitAmount: {
-        Currency: "GBP",  // fixe pour démo
-        Value: item.unitPrice || 1.20,  // fallback prix Rooh Afza
-        GrossValue: item.unitPrice || 1.20,  // TTC
-        TaxValues: [{
-          Code: "UK-2022-20%",  // ex. UK VAT
-          Value: (item.unitPrice || 1.20) * 0.2
-        }]
-      }
-    }));
-
     const body = {
       ...baseBody(),
       EnterpriseId: finalEnterpriseId,
       ServiceId: finalServiceId,
       AccountId: finalAccountId,
-      ProductOrders: productOrders  // ✅ Mews attend ÇA
     };
 
-    console.log("[MEWS] POST /api/connector/v1/orders/add body=", JSON.stringify(body, null, 2));
+    // ✅ FIX 1 : ne map QUE si les tableaux existent et ne sont pas vides
+    if (Array.isArray(productOrders) && productOrders.length > 0) {
+      body.ProductOrders = productOrders.map(item => ({
+        ProductId: item.productId || item.id,
+        UnitCount: item.quantity || item.qty || 1,
+        // Mews calcule le prix lui-même via ProductId
+        // (pas besoin de UnitAmount si ProductId fourni)
+      }));
+    } else if (Array.isArray(items) && items.length > 0) {
+      body.ProductOrders = items.map(item => ({
+        ProductId: item.productId || item.id,
+        UnitCount: item.quantity || item.qty || 1,
+      }));
+    }
+
+    if (notes) {
+      body.Notes = notes;
+    }
+
+    console.log("📤 [ORDERS] Envoi à Mews:", JSON.stringify(body, null, 2));
 
     const data = await mewsPost('/api/connector/v1/orders/add', body);
+    console.log("✅ [ORDERS] Mews OK:", data.OrderId);
     res.json(data);
   } catch (err) {
-    console.error("[ORDERS] Erreur:", err);
+    console.error("❌ [ORDERS] Erreur:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // =========================
 // PAIEMENTS / TERMINAL
